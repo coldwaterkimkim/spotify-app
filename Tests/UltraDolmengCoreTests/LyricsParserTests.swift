@@ -23,10 +23,23 @@ final class LyricsParserTests: XCTestCase {
             LyricsLine(time: 6, text: "later")
         ]
 
-        let caption = LyricsParser.caption(for: .synced(lines), progress: 1.5, offset: 0)
+        let caption = LyricsParser.caption(for: .synced(lines), progress: 1.5, duration: 10, offset: 0)
 
         XCTAssertEqual(caption.current, "current")
         XCTAssertNil(caption.next)
         XCTAssertFalse(caption.isFallback)
+    }
+
+    func testPlainLyricsApproximateCurrentLineByDuration() {
+        let caption = LyricsParser.caption(
+            for: .plain(["first", "second", "third", "fourth"]),
+            progress: 16,
+            duration: 40,
+            offset: 0
+        )
+
+        XCTAssertEqual(caption.current, "second")
+        XCTAssertNil(caption.next)
+        XCTAssertTrue(caption.isFallback)
     }
 }

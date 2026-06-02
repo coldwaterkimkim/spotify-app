@@ -16,12 +16,17 @@ enum LyricsParser {
             .filter { $0.isEmpty == false }
     }
 
-    static func caption(for payload: LyricsPayload, progress: TimeInterval, offset: TimeInterval) -> CaptionLines {
+    static func caption(
+        for payload: LyricsPayload,
+        progress: TimeInterval,
+        duration: TimeInterval?,
+        offset: TimeInterval
+    ) -> CaptionLines {
         switch payload {
         case .synced(let lines):
             return syncedCaption(lines: lines, progress: max(0, progress + offset))
         case .plain(let lines):
-            return CaptionLines(current: lines.first ?? "", next: nil, isFallback: true)
+            return plainCaption(lines: lines, progress: max(0, progress + offset), duration: duration)
         case .missing:
             return .empty
         }
@@ -43,6 +48,21 @@ enum LyricsParser {
 
         let current = lines[currentIndex].text
         return CaptionLines(current: current, next: nil, isFallback: false)
+    }
+
+    private static func plainCaption(lines: [String], progress: TimeInterval, duration: TimeInterval?) -> CaptionLines {
+        guard lines.isEmpty == false else {
+            return .empty
+        }
+
+        guard let duration, duration > 0 else {
+            return CaptionLines(current: lines[0], next: nil, isFallback: true)
+        }
+
+        let clampedProgress = min(max(0, progress), duration)
+        let ratio = clampedProgress / duration
+        let index = min(lines.count - 1, max(0, Int((ratio * Double(lines.count)).rounded(.down))))
+        return CaptionLines(current: lines[index], next: nil, isFallback: true)
     }
 
     private static func parseLine(_ line: String) -> [LyricsLine] {

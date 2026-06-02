@@ -53,6 +53,8 @@ cat >"$INFO_PLIST" <<PLIST
   <string>$MIN_SYSTEM_VERSION</string>
   <key>NSPrincipalClass</key>
   <string>NSApplication</string>
+  <key>NSAppleEventsUsageDescription</key>
+  <string>Spotify API가 요청 제한 중일 때 로컬 Spotify 앱에서 현재 재생 정보를 읽기 위해 사용합니다.</string>
   <key>LSUIElement</key>
   <true/>
 </dict>

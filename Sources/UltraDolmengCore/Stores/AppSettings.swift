@@ -11,10 +11,6 @@ final class AppSettings: ObservableObject {
         didSet { defaults.set(alwaysOnTop, forKey: Keys.alwaysOnTop) }
     }
 
-    @Published var mousePassThrough: Bool {
-        didSet { defaults.set(mousePassThrough, forKey: Keys.mousePassThrough) }
-    }
-
     @Published var captionOpacity: Double {
         didSet { defaults.set(captionOpacity, forKey: Keys.captionOpacity) }
     }
@@ -27,10 +23,6 @@ final class AppSettings: ObservableObject {
         didSet { defaults.set(captionMaxWidth, forKey: Keys.captionMaxWidth) }
     }
 
-    @Published var bottomOffset: Double {
-        didSet { defaults.set(bottomOffset, forKey: Keys.bottomOffset) }
-    }
-
     @Published var pauseFadeDelay: Double {
         didSet { defaults.set(pauseFadeDelay, forKey: Keys.pauseFadeDelay) }
     }
@@ -39,8 +31,34 @@ final class AppSettings: ObservableObject {
         didSet { defaults.set(lyricsOffset, forKey: Keys.lyricsOffset) }
     }
 
-    @Published var showPlainLyricsFallback: Bool {
-        didSet { defaults.set(showPlainLyricsFallback, forKey: Keys.showPlainLyricsFallback) }
+    @Published var likedSongsWarmupEnabled: Bool {
+        didSet { defaults.set(likedSongsWarmupEnabled, forKey: Keys.likedSongsWarmupEnabled) }
+    }
+
+    @Published var likedSongsWarmupResumeOffset: Int {
+        didSet { defaults.set(likedSongsWarmupResumeOffset, forKey: Keys.likedSongsWarmupResumeOffset) }
+    }
+
+    @Published var likedSongsWarmupTotal: Int {
+        didSet { defaults.set(likedSongsWarmupTotal, forKey: Keys.likedSongsWarmupTotal) }
+    }
+
+    @Published var likedSongsWarmupScannedCount: Int {
+        didSet { defaults.set(likedSongsWarmupScannedCount, forKey: Keys.likedSongsWarmupScannedCount) }
+    }
+
+    @Published var likedSongsWarmupCachedCount: Int {
+        didSet { defaults.set(likedSongsWarmupCachedCount, forKey: Keys.likedSongsWarmupCachedCount) }
+    }
+
+    @Published var likedSongsWarmupLastRun: Date? {
+        didSet {
+            if let likedSongsWarmupLastRun {
+                defaults.set(likedSongsWarmupLastRun, forKey: Keys.likedSongsWarmupLastRun)
+            } else {
+                defaults.removeObject(forKey: Keys.likedSongsWarmupLastRun)
+            }
+        }
     }
 
     let redirectURIHint = "http://127.0.0.1:43879/callback"
@@ -51,28 +69,34 @@ final class AppSettings: ObservableObject {
         self.defaults = defaults
         spotifyClientID = defaults.string(forKey: Keys.spotifyClientID) ?? ""
         alwaysOnTop = defaults.object(forKey: Keys.alwaysOnTop) as? Bool ?? true
-        mousePassThrough = defaults.object(forKey: Keys.mousePassThrough) as? Bool ?? false
         captionOpacity = defaults.object(forKey: Keys.captionOpacity) as? Double ?? 0.74
         captionFontSize = defaults.object(forKey: Keys.captionFontSize) as? Double ?? CaptionLayout.defaultFontSize
         captionMaxWidth = defaults.object(forKey: Keys.captionMaxWidth) as? Double ?? CaptionLayout.defaultMaxWidth
-        bottomOffset = defaults.object(forKey: Keys.bottomOffset) as? Double ?? 86
         pauseFadeDelay = defaults.object(forKey: Keys.pauseFadeDelay) as? Double ?? 3
         lyricsOffset = defaults.object(forKey: Keys.lyricsOffset) as? Double ?? 0
-        showPlainLyricsFallback = defaults.object(forKey: Keys.showPlainLyricsFallback) as? Bool ?? true
+        likedSongsWarmupEnabled = defaults.object(forKey: Keys.likedSongsWarmupEnabled) as? Bool ?? true
+        likedSongsWarmupResumeOffset = defaults.object(forKey: Keys.likedSongsWarmupResumeOffset) as? Int ?? 0
+        likedSongsWarmupTotal = defaults.object(forKey: Keys.likedSongsWarmupTotal) as? Int ?? 0
+        likedSongsWarmupScannedCount = defaults.object(forKey: Keys.likedSongsWarmupScannedCount) as? Int ?? 0
+        likedSongsWarmupCachedCount = defaults.object(forKey: Keys.likedSongsWarmupCachedCount) as? Int ?? 0
+        likedSongsWarmupLastRun = defaults.object(forKey: Keys.likedSongsWarmupLastRun) as? Date
     }
 }
 
 private enum Keys {
     static let spotifyClientID = "spotifyClientID"
     static let alwaysOnTop = "alwaysOnTop"
-    static let mousePassThrough = "mousePassThrough"
     static let captionOpacity = "captionOpacity"
     static let captionFontSize = "captionFontSize"
     static let captionMaxWidth = "captionMaxWidth"
-    static let bottomOffset = "bottomOffset"
     static let pauseFadeDelay = "pauseFadeDelay"
     static let lyricsOffset = "lyricsOffset"
-    static let showPlainLyricsFallback = "showPlainLyricsFallback"
+    static let likedSongsWarmupEnabled = "likedSongsWarmupEnabled"
+    static let likedSongsWarmupResumeOffset = "likedSongsWarmupResumeOffset"
+    static let likedSongsWarmupTotal = "likedSongsWarmupTotal"
+    static let likedSongsWarmupScannedCount = "likedSongsWarmupScannedCount"
+    static let likedSongsWarmupCachedCount = "likedSongsWarmupCachedCount"
+    static let likedSongsWarmupLastRun = "likedSongsWarmupLastRun"
 }
 
 enum CaptionLayout {
@@ -82,8 +106,9 @@ enum CaptionLayout {
     static let defaultMaxWidth: Double = 560
     static let minMaxWidth: Double = 360
     static let maxMaxWidth: Double = 860
-    static let windowHorizontalInset: Double = 56
-    static let windowAspectRatio: Double = 5.65
+    static let defaultBottomOffset: Double = 86
+    static let queuePanelHeight: Double = 218
+    static let queuePanelSpacing: Double = 8
 
     static func visualScale(for fontSize: Double) -> Double {
         let clampedFontSize = min(max(fontSize, minFontSize), maxFontSize)
@@ -92,5 +117,9 @@ enum CaptionLayout {
 
     static func fontSize(for storedFontSize: Double) -> Double {
         min(max(storedFontSize, minFontSize), maxFontSize)
+    }
+
+    static func captionPanelHeight(for storedFontSize: Double) -> Double {
+        ceil(fontSize(for: storedFontSize) * 1.35 + 20)
     }
 }

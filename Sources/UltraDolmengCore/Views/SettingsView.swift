@@ -97,7 +97,6 @@ struct SettingsView: View {
             }
 
             Toggle("항상 위에 띄우기", isOn: $settings.alwaysOnTop)
-            Toggle("마우스 통과 모드", isOn: $settings.mousePassThrough)
 
             sliderRow(
                 title: "배경 투명도",
@@ -125,21 +124,12 @@ struct SettingsView: View {
                 range: CaptionLayout.minMaxWidth...CaptionLayout.maxMaxWidth,
                 formattedValue: "\(Int(settings.captionMaxWidth))px"
             )
-
-            sliderRow(
-                title: "하단 여백",
-                value: $settings.bottomOffset,
-                range: 24...180,
-                formattedValue: "\(Int(settings.bottomOffset))px"
-            )
         }
     }
 
     private var behaviorSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionTitle("동작")
-
-            Toggle("싱크 없는 원문 가사도 보여주기", isOn: $settings.showPlainLyricsFallback)
 
             sliderRow(
                 title: "일시정지 후 숨김",
@@ -154,6 +144,32 @@ struct SettingsView: View {
                 range: -3...3,
                 formattedValue: String(format: "%+.1fs", settings.lyricsOffset)
             )
+
+            Toggle("좋아요 곡 가사 미리 캐시", isOn: $settings.likedSongsWarmupEnabled)
+                .onChange(of: settings.likedSongsWarmupEnabled) { _, enabled in
+                    if enabled {
+                        coordinator.startLikedSongsWarmupIfNeeded()
+                    } else {
+                        coordinator.stopLikedSongsWarmup()
+                    }
+                }
+
+            HStack(spacing: 8) {
+                Button("지금 다시 훑기") {
+                    coordinator.restartLikedSongsWarmup()
+                }
+                .disabled(settings.likedSongsWarmupEnabled == false || coordinator.isConnected == false)
+
+                if coordinator.isLikedSongsWarmupActive {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+
+            Text(coordinator.likedSongsWarmupStatusText)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
         }
     }
 

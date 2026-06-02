@@ -17,7 +17,7 @@ final class SpotifyAuthService {
     private let callbackServer = LoopbackOAuthServer()
     private let tokenAccount = "spotifyToken"
     private let tokenURL = URL(string: "https://accounts.spotify.com/api/token")!
-    private let scopes = "user-read-currently-playing user-read-playback-state"
+    private let scopes = "user-read-currently-playing user-read-playback-state user-modify-playback-state user-library-read"
 
     func storedToken() -> SpotifyToken? {
         do {
