@@ -44,46 +44,4 @@ final class SpotifyQueueModelTests: XCTestCase {
         XCTAssertEqual(items[1].uri, "spotify:episode:episode-1")
     }
 
-    func testSavedTracksResponseDecodesLikedSongs() throws {
-        let data = """
-        {
-          "href": "https://api.spotify.com/v1/me/tracks?offset=0&limit=50",
-          "items": [
-            {
-              "added_at": "2026-05-30T00:00:00Z",
-              "track": {
-                "id": "liked-1",
-                "name": "Liked Song",
-                "type": "track",
-                "duration_ms": 201000,
-                "album": { "name": "Liked Album" },
-                "artists": [
-                  { "name": "Liked Artist" }
-                ]
-              }
-            },
-            {
-              "added_at": "2026-05-30T00:01:00Z",
-              "track": null
-            }
-          ],
-          "limit": 50,
-          "next": null,
-          "offset": 0,
-          "previous": null,
-          "total": 2
-        }
-        """.data(using: .utf8)!
-
-        let response = try JSONDecoder().decode(SpotifySavedTracksResponse.self, from: data)
-        let tracks = response.trackInfos()
-
-        XCTAssertEqual(response.total, 2)
-        XCTAssertEqual(tracks.count, 1)
-        XCTAssertEqual(tracks[0].id, "liked-1")
-        XCTAssertEqual(tracks[0].title, "Liked Song")
-        XCTAssertEqual(tracks[0].artist, "Liked Artist")
-        XCTAssertEqual(tracks[0].album, "Liked Album")
-        XCTAssertEqual(tracks[0].durationMilliseconds, 201000)
-    }
 }

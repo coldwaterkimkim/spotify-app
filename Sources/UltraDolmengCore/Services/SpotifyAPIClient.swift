@@ -46,30 +46,6 @@ struct SpotifyAPIClient {
         return queue.queueItems()
     }
 
-    func savedTracks(
-        accessToken: String,
-        limit: Int = 50,
-        offset: Int = 0
-    ) async throws -> SpotifySavedTracksResponse {
-        var components = URLComponents(string: "https://api.spotify.com/v1/me/tracks")!
-        components.queryItems = [
-            URLQueryItem(name: "limit", value: "\(min(max(limit, 1), 50))"),
-            URLQueryItem(name: "offset", value: "\(max(offset, 0))")
-        ]
-
-        var request = URLRequest(url: components.url!)
-        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse else {
-            throw SpotifyAPIError.invalidResponse
-        }
-
-        try validate(data: data, http: http)
-
-        return try decoder.decode(SpotifySavedTracksResponse.self, from: data)
-    }
-
     func resume(accessToken: String) async throws {
         try await sendPlaybackCommand(
             accessToken: accessToken,

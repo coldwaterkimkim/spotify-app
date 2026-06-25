@@ -13,9 +13,8 @@
 - LRCLIB synced/plain lyrics 조회와 LRC 파싱 구현됨. 현재 실행 중에는 가사를 메모리 캐시하고, 한 번 받은 가사는 디스크 캐시에 저장함. exact/search 조회를 레이스시키고, LRCLIB 응답이 7~11초 걸리는 케이스를 확인해 timeout을 늘렸으며, provider 실패와 진짜 not found를 분리함. synced lyrics가 없고 plain lyrics만 있으면 곡 길이에 맞춰 대략적인 현재 줄을 보여줌.
 - Spotify API가 현재 곡 조회까지 `429 Too Many Requests`로 막힌 동안에는 로컬 Spotify Mac 앱의 AppleScript 재생 정보를 fallback으로 읽어 자막 패널을 계속 띄움. 이 fallback은 queue 조회/재생 제어가 아니라 현재 곡/재생 위치 표시용임.
 - queue를 읽으면 다음 3곡 가사를 백그라운드에서 순차 프리패치함. 같은 곡을 다시 듣거나 프리패치된 곡으로 넘어가면 네트워크 요청 없이 즉시 표시됨.
-- Spotify Liked Songs 전체를 백그라운드에서 훑는 가사 캐시 워머를 추가함. 앱 시작/Spotify 연결 후 최근 좋아요 구간을 먼저 확인하고, 이전에 멈춘 offset부터 전체 라이브러리 캐시를 이어서 진행함. 완료 후에는 하루 1번 최근 좋아요 구간을 다시 확인함. LRCLIB 가사 조회는 동시 32곡씩 병렬 처리함.
-- Spotify API가 `429 Too Many Requests`를 반환하면 `Retry-After`를 읽어 그 시간만큼 쉬고, 좋아요 곡 캐시는 같은 offset에서 이어서 진행함. 재생 상태 polling은 Spotify 부하를 줄이기 위해 2초 간격으로 조정됨.
-- 좋아요 곡 캐시에는 새 scope인 `user-library-read`가 필요하므로 기존 연결은 `다시 연결`이 필요할 수 있음.
+- Spotify API가 `429 Too Many Requests`를 반환하면 `Retry-After`를 읽어 그 시간 동안 현재 곡 조회를 쉬고, 로컬 Spotify 앱 fallback으로 자막 표시를 이어감. 재생 상태 polling은 Spotify 부하를 줄이기 위해 2초 간격으로 조정됨.
+- Liked Songs 전체를 훑는 백그라운드 가사 캐시 워머는 제거됨. 앱은 현재 재생곡과 queue 기반 프리패치에만 가사를 요청함.
 - 진짜 not found는 짧은 TTL로만 캐시하고, timeout/서버 실패는 캐시하지 않고 5초/15초 간격으로 재시도함.
 - 오버레이는 현재 줄 1줄만 표시함.
 - 가사 조회 중이라 현재 표시할 줄이 없어도 재생 중이면 오버레이 패널 자체는 유지됨.
@@ -32,7 +31,7 @@
 - 설정 창은 열릴 때만 잠깐 앞으로 끌어올리고, 이후에는 일반 창 레벨로 돌아감.
 - 첨부 사진을 얼굴/파란 안경 중심으로 crop해 `Resources/AppIcon.icns` macOS 앱 아이콘으로 연결함.
 - Spotify 연결 전에도 `미리보기 켜기`로 오버레이 UI를 확인할 수 있음.
-- `./script/build_and_run.sh --demo`로 Spotify 연결 없이 caption overlay까지 바로 띄울 수 있음.
+- `./script/build_and_run.sh --demo`로 Spotify 연결 없이 caption overlay까지 바로 띄울 수 있음. 데모 실행은 저장된 Spotify 토큰/Keychain을 확인하지 않음.
 - Spotify Developer Dashboard 앱 생성, Redirect URI 등록, Client ID 저장, OAuth 연결까지 이 Mac에서 완료됨.
 - 현재 Keychain에 Spotify refresh/access token이 저장되어 있고, 앱 상태는 `다시 연결 / 연결 해제`로 전환됨.
 
@@ -48,7 +47,6 @@ http://127.0.0.1:43879/callback
 
 - LRCLIB에 곡 자체가 없으면 lyrics가 표시되지 않을 수 있음. plain lyrics만 있는 곡은 정확한 싱크가 아니라 곡 길이 기반 근사 줄 표시로 동작함.
 - 처음 듣는 곡이고 로컬 캐시가 없으면 LRCLIB 서버 응답 시간만큼 첫 표시가 늦을 수 있음. 캐시와 프리패치는 반복/다음 곡 체감 시간을 줄이는 용도임.
-- Liked Songs 5,000곡 규모에서는 첫 전체 캐시가 LRCLIB 응답 속도에 좌우됨. 현재는 완료 시간을 줄이기 위해 동시 32곡씩 병렬 조회함.
 - Spotify API polling 기반이라 재생 위치는 주기적으로 보정되며, 완전한 push 실시간 이벤트는 아님.
 - Spotify queue는 Spotify가 현재 계산한 다음 재생 항목 기준이라 셔플, 수동 queue, 라디오/자동재생 상태에 따라 “원래 플레이리스트 전체 순서”와 다를 수 있음.
 - Spotify에는 queue의 n번째 항목으로 그대로 점프하는 전용 API가 없어, row 클릭은 선택 위치만큼 `next` 명령을 순차 실행하는 방식으로 동작함.

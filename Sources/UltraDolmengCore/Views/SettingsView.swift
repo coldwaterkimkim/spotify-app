@@ -27,7 +27,7 @@ struct SettingsView: View {
             .padding(22)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(width: 500, height: 650)
+        .frame(width: 500, height: 560)
 
         .onAppear {
             clientIDDraft = settings.spotifyClientID
@@ -144,32 +144,6 @@ struct SettingsView: View {
                 range: -3...3,
                 formattedValue: String(format: "%+.1fs", settings.lyricsOffset)
             )
-
-            Toggle("좋아요 곡 가사 미리 캐시", isOn: $settings.likedSongsWarmupEnabled)
-                .onChange(of: settings.likedSongsWarmupEnabled) { _, enabled in
-                    if enabled {
-                        coordinator.startLikedSongsWarmupIfNeeded()
-                    } else {
-                        coordinator.stopLikedSongsWarmup()
-                    }
-                }
-
-            HStack(spacing: 8) {
-                Button("지금 다시 훑기") {
-                    coordinator.restartLikedSongsWarmup()
-                }
-                .disabled(settings.likedSongsWarmupEnabled == false || coordinator.isConnected == false)
-
-                if coordinator.isLikedSongsWarmupActive {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-            }
-
-            Text(coordinator.likedSongsWarmupStatusText)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
         }
     }
 

@@ -25,8 +25,6 @@ Spotify 공식 API는 현재 곡, 재생 상태, 재생 위치, 현재 queue 조
 
 체감 속도를 줄이기 위해 한 번 받은 가사는 로컬 캐시에 저장한다. 같은 곡을 다시 들으면 네트워크 요청 없이 즉시 표시되고, queue를 읽은 뒤에는 다음 3곡을 백그라운드에서 순차적으로 미리 가져온다. 진짜 not found 결과는 짧게만 캐시하고, timeout/서버 실패는 캐시하지 않고 재시도한다.
 
-설정에서 `좋아요 곡 가사 미리 캐시`를 켜두면 Spotify Liked Songs를 백그라운드에서 훑으면서 로컬 가사 캐시를 채운다. 첫 전체 캐시 후에는 앱이 켜져 있는 동안 하루에 한 번 최근 좋아요 구간을 확인해서 새로 추가한 곡도 자동으로 캐시에 들어오게 한다. 대량 라이브러리를 전제로 Spotify 목록은 50곡 단위로 읽고, LRCLIB 가사 조회는 동시 32곡씩 병렬 처리한다. Spotify가 `429 Too Many Requests`를 반환하면 `Retry-After`만큼 자동으로 쉬었다가 같은 위치에서 이어서 진행한다.
-
 처음 연결 전에 Spotify Developer Dashboard에서 앱을 만들고 Redirect URI에 아래 값을 등록해야 한다.
 
 ```text
@@ -35,7 +33,7 @@ http://127.0.0.1:43879/callback
 
 그 다음 앱 설정 창에 Spotify Client ID를 입력하고 `Spotify 연결`을 누르면 된다.
 
-queue 항목 클릭 재생과 hover playback controls에는 `user-modify-playback-state`, 좋아요 곡 캐시에는 `user-library-read` scope가 필요하므로, 이 기능들이 추가되기 전 토큰을 쓰고 있다면 설정 창에서 `다시 연결`을 한 번 눌러 새 권한을 받아야 한다.
+queue 항목 클릭 재생과 hover playback controls에는 `user-modify-playback-state` scope가 필요하므로, 이 기능이 추가되기 전 토큰을 쓰고 있다면 설정 창에서 `다시 연결`을 한 번 눌러 새 권한을 받아야 한다.
 
 Spotify Web API에는 queue의 n번째 항목으로 직접 점프하면서 queue를 보존하는 전용 endpoint가 없다. 그래서 queue row 클릭은 화면에서 먼저 선택 이전 항목을 빼고, 뒤에서 선택 위치만큼 `next` 명령만 조용히 실행해 Spotify의 현재 queue 흐름을 최대한 유지한다.
 
@@ -59,6 +57,8 @@ Spotify 연결 전 자막 오버레이 미리보기까지 띄우는 실행:
 ./script/build_and_run.sh --demo
 ```
 
+데모 실행은 저장된 Spotify 토큰이나 Keychain을 확인하지 않고, 설정창과 오버레이 UI만 미리 보여준다.
+
 설정 창 없이 백그라운드로 실행:
 
 ```bash
@@ -74,4 +74,4 @@ Spotify 연결 전 자막 오버레이 미리보기까지 띄우는 실행:
 - `Sources/UltraDolmengCore/Services`: Spotify OAuth/API, LRCLIB, 가사 파서, playback coordinator.
 - `Sources/UltraDolmengCore/Stores`: 사용자 설정 저장.
 - `Resources/AppIcon.icns`: Finder/app bundle에서 쓰는 macOS 앱 아이콘.
-- `Tests/UltraDolmengCoreTests`: LRC 파서, 1줄 caption 선택, LRCLIB 조회, 디스크 캐시, Spotify queue/liked songs 모델 decode 테스트.
+- `Tests/UltraDolmengCoreTests`: LRC 파서, 1줄 caption 선택, LRCLIB 조회, 디스크 캐시, Spotify queue 모델 decode 테스트.

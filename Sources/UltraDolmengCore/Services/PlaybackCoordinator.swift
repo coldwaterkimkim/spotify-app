@@ -10,8 +10,6 @@ final class PlaybackCoordinator: ObservableObject {
     @Published private(set) var queueItems: [QueueItemInfo] = []
     @Published private(set) var isQueueLoading = false
     @Published private(set) var queueStatusText: String?
-    @Published private(set) var likedSongsWarmupStatusText = "좋아요 곡 캐시 대기 중"
-    @Published private(set) var isLikedSongsWarmupActive = false
     @Published var demoMode = false
 
     var isPlaybackActive: Bool {
@@ -37,7 +35,6 @@ final class PlaybackCoordinator: ObservableObject {
     private var queueTask: Task<Void, Never>?
     private var queuePrefetchTask: Task<Void, Never>?
     private var lyricsPrefetchTask: Task<Void, Never>?
-    private var likedSongsWarmupTask: Task<Void, Never>?
     private var lyricsTask: Task<Void, Never>?
     private var lyricsRetryTask: Task<Void, Never>?
     private var currentTrack: TrackInfo?
@@ -64,11 +61,10 @@ final class PlaybackCoordinator: ObservableObject {
         self.lyricsDiskCache = lyricsDiskCache
     }
 
-    func start() {
-        isConnected = authService.storedToken() != nil
+    func start(loadStoredToken: Bool = true) {
+        isConnected = loadStoredToken && authService.storedToken() != nil
         displayState = isConnected ? .idle : .disconnected
         startTimers()
-        startLikedSongsWarmupIfNeeded()
     }
 
     func stop() {
@@ -77,7 +73,6 @@ final class PlaybackCoordinator: ObservableObject {
         queueTask?.cancel()
         queuePrefetchTask?.cancel()
         lyricsPrefetchTask?.cancel()
-        likedSongsWarmupTask?.cancel()
         lyricsTask?.cancel()
         lyricsRetryTask?.cancel()
         lyricsRequests.values.forEach { $0.cancel() }
@@ -86,7 +81,6 @@ final class PlaybackCoordinator: ObservableObject {
         queueTask = nil
         queuePrefetchTask = nil
         lyricsPrefetchTask = nil
-        likedSongsWarmupTask = nil
         lyricsTask = nil
         lyricsRetryTask = nil
         lyricsRequests = [:]
@@ -101,7 +95,6 @@ final class PlaybackCoordinator: ObservableObject {
                 demoMode = false
                 displayState = .idle
                 statusText = "Spotify 연결됨"
-                startLikedSongsWarmupIfNeeded(force: true)
                 await pollSpotify(force: true)
             } catch {
                 statusText = error.localizedDescription
@@ -119,7 +112,6 @@ final class PlaybackCoordinator: ObservableObject {
             queueTask?.cancel()
             queuePrefetchTask?.cancel()
             lyricsPrefetchTask?.cancel()
-            stopLikedSongsWarmup()
             lyricsTask?.cancel()
             lyricsRetryTask?.cancel()
             queueItems = []
@@ -132,46 +124,8 @@ final class PlaybackCoordinator: ObservableObject {
         }
     }
 
-    func startLikedSongsWarmupIfNeeded(force: Bool = false) {
-        guard settings.likedSongsWarmupEnabled else {
-            stopLikedSongsWarmup()
-            likedSongsWarmupStatusText = "좋아요 곡 캐시 꺼짐"
-            return
-        }
-
-        guard isConnected else {
-            likedSongsWarmupStatusText = "Spotify 연결 후 좋아요 곡 캐시 가능"
-            return
-        }
-
-        if force {
-            likedSongsWarmupTask?.cancel()
-            likedSongsWarmupTask = nil
-        } else if likedSongsWarmupTask != nil {
-            return
-        }
-
-        likedSongsWarmupTask = Task { [weak self] in
-            await self?.runLikedSongsWarmup(force: force)
-        }
-    }
-
-    func restartLikedSongsWarmup() {
-        settings.likedSongsWarmupResumeOffset = 0
-        settings.likedSongsWarmupLastRun = nil
-        startLikedSongsWarmupIfNeeded(force: true)
-    }
-
-    func stopLikedSongsWarmup() {
-        likedSongsWarmupTask?.cancel()
-        likedSongsWarmupTask = nil
-        isLikedSongsWarmupActive = false
-        likedSongsWarmupStatusText = "좋아요 곡 캐시 꺼짐"
-    }
-
     func showDemoOverlay() {
         demoMode = true
-        isConnected = authService.storedToken() != nil
         let demoTrack = TrackInfo(
             id: "demo",
             title: "Caption Preview",
@@ -291,8 +245,7 @@ final class PlaybackCoordinator: ObservableObject {
         if demoMode {
             guard queueItems.indices.contains(index) else { return }
             let item = queueItems[index]
-            statusText = "미리보기 queue 선택: \(item.title)"
-            caption = CaptionLines(current: item.title, next: nil, isFallback: true)
+            applyDemoQueueSelection(item, statusPrefix: "미리보기 queue 선택")
             queueItems.removeFirst(index + 1)
             return
         }
@@ -359,7 +312,7 @@ final class PlaybackCoordinator: ObservableObject {
             statusText = "미리보기 다음 곡"
             guard queueItems.isEmpty == false else { return }
             let item = queueItems.removeFirst()
-            caption = CaptionLines(current: item.title, next: nil, isFallback: true)
+            applyDemoQueueSelection(item, statusPrefix: "미리보기 다음 곡")
             return
         }
 
@@ -665,216 +618,13 @@ final class PlaybackCoordinator: ObservableObject {
         }
     }
 
-    private func runLikedSongsWarmup(force: Bool) async {
-        var shouldForceFullSweep = force
-        isLikedSongsWarmupActive = true
-
-        do {
-            while Task.isCancelled == false, settings.likedSongsWarmupEnabled, isConnected {
-                let total = try await warmRecentLikedSongs()
-                let shouldSweepLibrary = shouldForceFullSweep
-                    || settings.likedSongsWarmupLastRun == nil
-                    || settings.likedSongsWarmupResumeOffset > 0
-
-                if shouldSweepLibrary, total > 0 {
-                    try await warmLikedSongsLibrary(total: total, force: shouldForceFullSweep)
-                } else if total == 0 {
-                    likedSongsWarmupStatusText = "좋아요 표시한 곡이 아직 없어"
-                }
-
-                settings.likedSongsWarmupLastRun = Date()
-                shouldForceFullSweep = false
-
-                if Task.isCancelled == false, settings.likedSongsWarmupEnabled {
-                    likedSongsWarmupStatusText = "좋아요 곡 캐시 대기 중 · \(likedSongsWarmupStats)"
-                    try await Task.sleep(nanoseconds: LikedSongsWarmup.recentSweepIntervalNanoseconds)
-                }
-            }
-        } catch is CancellationError {
-            // Normal when the user disconnects, quits, or turns this feature off.
-        } catch SpotifyAPIError.requestFailed(let status, _) where status == 403 {
-            likedSongsWarmupStatusText = "좋아요 곡 권한 필요 · Spotify 다시 연결"
-        } catch LikedSongsWarmupError.disconnected {
-            likedSongsWarmupStatusText = "Spotify 연결 후 좋아요 곡 캐시 가능"
-        } catch {
-            likedSongsWarmupStatusText = "좋아요 곡 캐시 일시 중단 · \(error.localizedDescription)"
-        }
-
-        isLikedSongsWarmupActive = false
-    }
-
-    @discardableResult
-    private func warmRecentLikedSongs() async throws -> Int {
-        let recentPages = 2
-        var total = 0
-
-        for pageIndex in 0..<recentPages {
-            try Task.checkCancellation()
-            let offset = pageIndex * LikedSongsWarmup.pageSize
-            let page = try await likedSongsPage(offset: offset)
-            total = page.total
-            settings.likedSongsWarmupTotal = page.total
-
-            guard page.items.isEmpty == false else {
-                break
-            }
-
-            try await warmLikedSongTracks(
-                page.trackInfos(),
-                phase: "최근 좋아요 확인",
-                visibleOffset: page.offset,
-                total: page.total
-            )
-
-            if page.offset + page.items.count >= page.total {
-                break
-            }
-
-            try Task.checkCancellation()
-        }
-
-        return total
-    }
-
-    private func warmLikedSongsLibrary(total: Int, force: Bool) async throws {
-        var offset = force ? 0 : settings.likedSongsWarmupResumeOffset
-        let recentScanUpperBound = min(LikedSongsWarmup.pageSize * 2, total)
-
-        if force == false, offset < recentScanUpperBound {
-            offset = recentScanUpperBound
-        }
-
-        if offset >= total {
-            offset = 0
-        }
-
-        while Task.isCancelled == false, offset < total {
-            let page = try await likedSongsPage(offset: offset)
-            settings.likedSongsWarmupTotal = page.total
-
-            guard page.items.isEmpty == false else {
-                settings.likedSongsWarmupResumeOffset = 0
-                break
-            }
-
-            likedSongsWarmupStatusText = "좋아요 곡 전체 캐시 중 \(min(page.offset + page.items.count, page.total))/\(page.total)"
-            try await warmLikedSongTracks(
-                page.trackInfos(),
-                phase: "좋아요 곡 전체 캐시",
-                visibleOffset: page.offset,
-                total: page.total
-            )
-
-            let nextOffset = page.offset + page.items.count
-            if nextOffset >= page.total {
-                settings.likedSongsWarmupResumeOffset = 0
-                likedSongsWarmupStatusText = "좋아요 곡 전체 훑기 완료 · \(likedSongsWarmupStats)"
-                break
-            }
-
-            settings.likedSongsWarmupResumeOffset = nextOffset
-            offset = nextOffset
-            try Task.checkCancellation()
-        }
-    }
-
-    private func warmLikedSongTracks(
-        _ tracks: [TrackInfo],
-        phase: String,
-        visibleOffset: Int,
-        total: Int
-    ) async throws {
-        let workItems = tracks.enumerated().map { index, track in
-            LikedSongsWarmupWorkItem(
-                track: track,
-                displayIndex: min(visibleOffset + index + 1, total)
-            )
-        }
-
-        for batchStart in stride(
-            from: 0,
-            to: workItems.count,
-            by: LikedSongsWarmup.maxConcurrentLyricsRequests
-        ) {
-            try Task.checkCancellation()
-            let batchEnd = min(batchStart + LikedSongsWarmup.maxConcurrentLyricsRequests, workItems.count)
-            let batch = Array(workItems[batchStart..<batchEnd])
-            likedSongsWarmupStatusText = "\(phase) \(batch.first?.displayIndex ?? visibleOffset + 1)-\(batch.last?.displayIndex ?? visibleOffset + 1)/\(total) · 동시 \(LikedSongsWarmup.maxConcurrentLyricsRequests)곡"
-
-            try await withThrowingTaskGroup(of: Void.self) { group in
-                for item in batch {
-                    group.addTask { [weak self] in
-                        guard let self else { return }
-                        try await self.warmLikedSongTrack(
-                            item.track,
-                            phase: phase,
-                            displayIndex: item.displayIndex,
-                            total: total
-                        )
-                    }
-                }
-
-                try await group.waitForAll()
-            }
-        }
-    }
-
-    private func warmLikedSongTrack(
-        _ track: TrackInfo,
-        phase: String,
-        displayIndex: Int,
-        total: Int
-    ) async throws {
-        try Task.checkCancellation()
-        settings.likedSongsWarmupScannedCount += 1
-
-        let key = LyricsCacheKey(track: track)
-        if lyricsCache[key] != nil || lyricsDiskCache.lyrics(for: key) != nil {
-            likedSongsWarmupStatusText = "\(phase) \(displayIndex)/\(total) · 이미 캐시됨"
-            return
-        }
-
-        likedSongsWarmupStatusText = "\(phase) \(displayIndex)/\(total) · \(track.title)"
-        do {
-            _ = try await cachedLyrics(for: track)
-            settings.likedSongsWarmupCachedCount += 1
-        } catch {
-            guard Task.isCancelled == false else { throw CancellationError() }
-        }
-    }
-
-    private func likedSongsPage(offset: Int) async throws -> SpotifySavedTracksResponse {
-        while Task.isCancelled == false {
-            try await waitForSpotifyRateLimitIfNeeded(reason: "좋아요 곡 캐시")
-
-            guard let token = try await authService.validAccessToken(clientID: settings.spotifyClientID) else {
-                throw LikedSongsWarmupError.disconnected
-            }
-
-            do {
-                return try await spotifyClient.savedTracks(
-                    accessToken: token,
-                    limit: LikedSongsWarmup.pageSize,
-                    offset: offset
-                )
-            } catch SpotifyAPIError.rateLimited(let retryAfter) {
-                applySpotifyRateLimit(retryAfter, reason: "좋아요 곡 캐시")
-            }
-        }
-
-        throw CancellationError()
-    }
-
-    private var likedSongsWarmupStats: String {
-        let total = settings.likedSongsWarmupTotal
-        let scanned = settings.likedSongsWarmupScannedCount
-        let cached = settings.likedSongsWarmupCachedCount
-
-        if total > 0 {
-            return "전체 \(total), 누적 확인 \(scanned), 새 캐시 \(cached)"
-        }
-
-        return "누적 확인 \(scanned), 새 캐시 \(cached)"
+    private func applyDemoQueueSelection(_ item: QueueItemInfo, statusPrefix: String) {
+        let track = item.approximateTrackInfo()
+        currentTrack = track
+        currentLyrics = .plain([item.title])
+        displayState = .playing(track)
+        caption = CaptionLines(current: item.title, next: nil, isFallback: true)
+        statusText = "\(statusPrefix): \(item.title)"
     }
 
     private func applySpotifyRateLimit(_ retryAfter: TimeInterval, reason: String) {
@@ -888,7 +638,6 @@ final class PlaybackCoordinator: ObservableObject {
         let rounded = Int(ceil(waitSeconds))
         let message = "Spotify 요청 제한 · \(rounded)초 후 재개"
         statusText = "\(message) (\(reason))"
-        likedSongsWarmupStatusText = message
     }
 
     private func spotifyRateLimitRemaining(now: Date = Date()) -> TimeInterval? {
@@ -903,21 +652,6 @@ final class PlaybackCoordinator: ObservableObject {
         }
 
         return remaining
-    }
-
-    private func waitForSpotifyRateLimitIfNeeded(reason: String) async throws {
-        guard let targetUntil = spotifyRateLimitedUntil,
-              let remaining = spotifyRateLimitRemaining() else {
-            return
-        }
-
-        let rounded = Int(ceil(remaining))
-        likedSongsWarmupStatusText = "Spotify 요청 제한 · \(rounded)초 쉬는 중"
-        statusText = "Spotify 요청 제한 · \(rounded)초 쉬는 중 (\(reason))"
-        try await Task.sleep(nanoseconds: UInt64(max(0.1, remaining) * 1_000_000_000))
-        if spotifyRateLimitedUntil == targetUntil {
-            spotifyRateLimitedUntil = nil
-        }
     }
 
     private func cachedLyrics(for track: TrackInfo) async throws -> LyricsPayload {
@@ -974,7 +708,7 @@ final class PlaybackCoordinator: ObservableObject {
             return
         }
 
-        guard track.isPlaying || demoMode else {
+        guard isPlaybackActive else {
             return
         }
 
@@ -1018,27 +752,5 @@ final class PlaybackCoordinator: ObservableObject {
             QueueItemInfo(id: "demo-7", title: "Young Folks", artist: "Peter Bjorn and John", kind: "track", uri: "spotify:track:4dyx5SzxPPaD8xQIid5Wjj"),
             QueueItemInfo(id: "demo-8", title: "Lisztomania", artist: "Phoenix", kind: "track", uri: "spotify:track:7fmJGzyvNdfk2gbkQncUuS")
         ]
-    }
-}
-
-private enum LikedSongsWarmup {
-    static let pageSize = 50
-    static let maxConcurrentLyricsRequests = 32
-    static let recentSweepIntervalNanoseconds: UInt64 = 24 * 60 * 60 * 1_000_000_000
-}
-
-private struct LikedSongsWarmupWorkItem {
-    let track: TrackInfo
-    let displayIndex: Int
-}
-
-private enum LikedSongsWarmupError: LocalizedError {
-    case disconnected
-
-    var errorDescription: String? {
-        switch self {
-        case .disconnected:
-            return "Spotify 연결이 필요해."
-        }
     }
 }

@@ -21,12 +21,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.settingsWindowController.show()
         }
 
-        coordinator.start()
+        coordinator.start(loadStoredToken: isDemoLaunch == false)
         if isBackgroundLaunch {
             suppressReopenUntil = Date().addingTimeInterval(2)
         }
 
-        if CommandLine.arguments.contains("--demo") {
+        if isDemoLaunch {
             settingsWindowController.show()
             coordinator.showDemoOverlay()
         } else if shouldShowSettingsOnLaunch {
@@ -59,5 +59,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var isBackgroundLaunch: Bool {
         CommandLine.arguments.contains("--background")
+    }
+
+    private var isDemoLaunch: Bool {
+        CommandLine.arguments.contains("--demo")
     }
 }

@@ -31,36 +31,6 @@ final class AppSettings: ObservableObject {
         didSet { defaults.set(lyricsOffset, forKey: Keys.lyricsOffset) }
     }
 
-    @Published var likedSongsWarmupEnabled: Bool {
-        didSet { defaults.set(likedSongsWarmupEnabled, forKey: Keys.likedSongsWarmupEnabled) }
-    }
-
-    @Published var likedSongsWarmupResumeOffset: Int {
-        didSet { defaults.set(likedSongsWarmupResumeOffset, forKey: Keys.likedSongsWarmupResumeOffset) }
-    }
-
-    @Published var likedSongsWarmupTotal: Int {
-        didSet { defaults.set(likedSongsWarmupTotal, forKey: Keys.likedSongsWarmupTotal) }
-    }
-
-    @Published var likedSongsWarmupScannedCount: Int {
-        didSet { defaults.set(likedSongsWarmupScannedCount, forKey: Keys.likedSongsWarmupScannedCount) }
-    }
-
-    @Published var likedSongsWarmupCachedCount: Int {
-        didSet { defaults.set(likedSongsWarmupCachedCount, forKey: Keys.likedSongsWarmupCachedCount) }
-    }
-
-    @Published var likedSongsWarmupLastRun: Date? {
-        didSet {
-            if let likedSongsWarmupLastRun {
-                defaults.set(likedSongsWarmupLastRun, forKey: Keys.likedSongsWarmupLastRun)
-            } else {
-                defaults.removeObject(forKey: Keys.likedSongsWarmupLastRun)
-            }
-        }
-    }
-
     let redirectURIHint = "http://127.0.0.1:43879/callback"
 
     private let defaults: UserDefaults
@@ -74,12 +44,6 @@ final class AppSettings: ObservableObject {
         captionMaxWidth = defaults.object(forKey: Keys.captionMaxWidth) as? Double ?? CaptionLayout.defaultMaxWidth
         pauseFadeDelay = defaults.object(forKey: Keys.pauseFadeDelay) as? Double ?? 3
         lyricsOffset = defaults.object(forKey: Keys.lyricsOffset) as? Double ?? 0
-        likedSongsWarmupEnabled = defaults.object(forKey: Keys.likedSongsWarmupEnabled) as? Bool ?? true
-        likedSongsWarmupResumeOffset = defaults.object(forKey: Keys.likedSongsWarmupResumeOffset) as? Int ?? 0
-        likedSongsWarmupTotal = defaults.object(forKey: Keys.likedSongsWarmupTotal) as? Int ?? 0
-        likedSongsWarmupScannedCount = defaults.object(forKey: Keys.likedSongsWarmupScannedCount) as? Int ?? 0
-        likedSongsWarmupCachedCount = defaults.object(forKey: Keys.likedSongsWarmupCachedCount) as? Int ?? 0
-        likedSongsWarmupLastRun = defaults.object(forKey: Keys.likedSongsWarmupLastRun) as? Date
     }
 }
 
@@ -91,12 +55,6 @@ private enum Keys {
     static let captionMaxWidth = "captionMaxWidth"
     static let pauseFadeDelay = "pauseFadeDelay"
     static let lyricsOffset = "lyricsOffset"
-    static let likedSongsWarmupEnabled = "likedSongsWarmupEnabled"
-    static let likedSongsWarmupResumeOffset = "likedSongsWarmupResumeOffset"
-    static let likedSongsWarmupTotal = "likedSongsWarmupTotal"
-    static let likedSongsWarmupScannedCount = "likedSongsWarmupScannedCount"
-    static let likedSongsWarmupCachedCount = "likedSongsWarmupCachedCount"
-    static let likedSongsWarmupLastRun = "likedSongsWarmupLastRun"
 }
 
 enum CaptionLayout {

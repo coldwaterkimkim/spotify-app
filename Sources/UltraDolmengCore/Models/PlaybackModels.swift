@@ -107,26 +107,6 @@ struct SpotifyQueueResponse: Decodable {
     let queue: [SpotifyQueueItem]
 }
 
-struct SpotifySavedTracksResponse: Decodable {
-    let href: String?
-    let items: [SpotifySavedTrackItem]
-    let limit: Int
-    let next: String?
-    let offset: Int
-    let previous: String?
-    let total: Int
-}
-
-struct SpotifySavedTrackItem: Decodable {
-    let addedAt: String?
-    let track: SpotifyTrackItem?
-
-    enum CodingKeys: String, CodingKey {
-        case addedAt = "added_at"
-        case track
-    }
-}
-
 struct SpotifyQueueItem: Decodable {
     let id: String?
     let uri: String?
@@ -162,14 +142,6 @@ extension SpotifyPlaybackResponse {
             isPlaying: isPlaying,
             capturedAt: capturedAt
         )
-    }
-}
-
-extension SpotifySavedTracksResponse {
-    func trackInfos(capturedAt: Date = Date()) -> [TrackInfo] {
-        items.compactMap { item in
-            item.track?.trackInfo(capturedAt: capturedAt)
-        }
     }
 }
 
